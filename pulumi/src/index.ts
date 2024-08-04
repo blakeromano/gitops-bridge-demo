@@ -18,7 +18,7 @@ const config = new pulumi.Config()
 
 let roleMappings: eks.RoleMapping[] = []
 
-const clusterComponents = config.requireObject("clusterComponents")
+const clusterComponents: any = config.requireObject("clusterComponents")
 
 export const outputs: {[key: string]: any} = {
   "stackName": stackName,
@@ -111,14 +111,6 @@ const eksCluster = new eks.Cluster(`${stackName}-cluster`, {
     "name": stackName,
   },
 },{
-  // transformations: [args => {
-  //   if (args.type === "aws:eks/cluster:Cluster") {
-  //     args.props["accessConfig"] = {
-  //       authenticationMode: "CONFIG_MAP"  //TODO investigate how to make it work with API_AND_CONFIG_MAP
-  //     };
-  //   }
-  //   return undefined;
-  // }]
 })
 
 new aws.eks.Addon("eks-pod-identity-agent", {
@@ -130,9 +122,11 @@ outputs.clusterName = eksCluster.eksCluster.name
 outputs.clusterApiEndpoint = eksCluster.core.endpoint
 
 const oidcProviderUrl = eksCluster.core.oidcProvider?.url as pulumi.Output<string>
-const { veleroIamRole, veleroBucket } = createVeleroResources(awsAccountId, oidcProviderUrl, stackName)
-outputs.veleroBucket = veleroBucket.bucket,
-outputs.veleroIamRoleArn = veleroIamRole.arn
+if (clusterComponents.enable_velero) {
+  const { veleroIamRole, veleroBucket } = createVeleroResources(awsAccountId, oidcProviderUrl, stackName)
+  outputs.veleroBucket = veleroBucket.bucket,
+  outputs.veleroIamRoleArn = veleroIamRole.arn
+}
 
 // If we are creating the hub cluster we need pods in eks cluster to be able to assume
 // so we need cluster created first
